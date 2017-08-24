@@ -1,0 +1,12 @@
+[prod]
+#should not have manual updates, alwasy pull from GIT
+
+
+
+[staging]
+#close to prod, and will push changes to GIT for config changes, and Job changes.
+#can be same as testing 
+
+
+[testing]
+#UI is open for DevOps/System team for experimenting

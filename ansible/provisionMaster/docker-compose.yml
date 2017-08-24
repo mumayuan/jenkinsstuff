@@ -1,0 +1,18 @@
+# {{ ansible_managed }}
+master:
+ image:  {{docker_repo}}{{master_image}}:{{master_version}}
+ privileged: true
+ volumes:
+  - /var/jenkins_home:/var/jenkins_home
+ ports:
+  - "50000:50000"
+ environment:
+   - JAVA_OPTS=-Duser.timezone={{timezone}} 
+nginx:
+ image:  {{docker_repo}}{{nginx_image}}:{{nginx_version}}
+ ports:
+  - "{{masterPort}}:80"
+ links:
+  - master:jenkins-master
+
+

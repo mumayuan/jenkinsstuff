@@ -1,0 +1,135 @@
+---
+
+- hosts: '{{remotehost}}'
+
+
+
+  vars:
+    description: “this is to set up a Jenkins from GIT content, and the docker Jenkins master image.”
+    docker_repo: hc-us-east-aws-artifactory.cloud.health.ge.com/
+    master_image: jaas/jenkins-master
+    master_version: 1.0.201611
+    nginx_image: jaas/jenkins-nginx
+    nginx_version: 1.0.201611
+    masterPort: 80
+    port8080: ""
+    team: CTT
+
+    dockerComposeDir: /home/jenkins
+    resetContentFromGit: false
+    nonProduction: false
+    useNginx: true
+    https: false
+    proxysetting: proxysetting
+
+        
+  environment:
+      no_proxy: 3.* 
+
+
+
+  remote_user: "{{remoteuser}}"
+  become_user: root
+  become_method: sudo
+  become: true
+
+  tasks:
+  - name:  add Jenkins user
+    user: 
+        name: jenkins
+        password: notReallyNeeded4Jenkins
+       
+
+  - name: update the service
+    template:
+        src: jaas.service
+        dest: /etc/systemd/system/jaas.service 
+
+  - name: update the docker-compose https file
+    template:
+      src: docker-compose-ssl.yml
+      dest: "{{dockerComposeDir}}/docker-compose-jenkins.yml"
+    when: useNginx  and https
+
+
+
+  - name: update the docker-compose file
+    template:
+        src: docker-compose.yml
+        dest: "{{dockerComposeDir}}/docker-compose-jenkins.yml"
+    when: useNginx and not https
+
+  - name: update the docker-compose file for no Nginx
+    template:
+        src: docker-compose-noNginx.yml
+        dest: "{{dockerComposeDir}}/docker-compose-jenkins.yml"
+    when:  useNginx != 'true'
+
+  
+  - name: stop service  
+    systemd: name=jaas state=stopped
+
+  - name: wipe out jenkins for fresh content from GIT
+    shell: rm -rf /var/jenkins_home/*
+    #ignore_errors: yes
+    when: resetContentFromGit
+
+  - name: prep for next running Jenkins by cleanning up the plugin directory
+    script: ./prepJenkins.sh
+    ignore_errors: yes
+
+  
+  - name: sync jenkins master configurations from GIT
+    synchronize: src={{masterdir}}/ dest=/var/jenkins_home
+    when: resetContentFromGit
+
+  - name: unset triggers for pipeline or disable the job, such as SCM triggers and scheduled jobs in non production 
+    copy: src=disableSCMPolling.groovy dest=/var/jenkins_home/init.groovy.d/disableSCMPolling.groovy  owner=jenkins backup=no mode="0755"
+    when: nonProduction
+  
+ 
+  - name: turn off security
+    replace: dest=/var/jenkins_home/config.xml regexp='<useSecurity>true</useSecurity>' replace='<useSecurity>false</useSecurity>' backup=yes
+    when: nonProduction
+  
+ 
+  - name: set system message 
+    replace: dest=/var/jenkins_home/config.xml regexp='<systemMessage>.*systemMessage>' replace='<systemMessage>{{team}} environment {{remotehost}} with master version {{master_version}} in timezone {{timezone}}</systemMessage>' backup=no
+  
+  - name: fix up the access mode
+    script: ./fixMode.sh
+    ignore_errors: yes
+ 
+
+  - name: make sure jenkins_home/.ssh exist
+    file: path=/var/jenkins_home/.ssh state=directory owner=jenkins
+
+    
+  - name: populate master id_rsa key          
+    copy: src={{idDir}}/id_rsa  dest=/var/jenkins_home/.ssh  mode="0600" owner=jenkins
+
+  - name: populate master id_rsa.pub key          
+    copy: src={{idDir}}/id_rsa.pub  dest=/var/jenkins_home/.ssh  mode="0644" owner=jenkins
+
+
+  - name: populate https stuff
+    copy: src={{idDir}} dest={{dockerComposeDir}}
+    when: https
+
+
+  - name: populate https jenkins conf for nginx
+    template:
+      src: jenkins.conf
+      dest: "{{dockerComposeDir}}/id/jenkins.conf"
+    when: https
+
+
+  - name: start service  
+    systemd: name=jaas state=reloaded daemon_reload=yes enabled=yes
+  
+  - wait_for: port={{masterPort}} delay=0 timeout=600 
+
+  - name: run some post docker command
+    script: ./postDocker.sh
+    ignore_errors: yes
+ 

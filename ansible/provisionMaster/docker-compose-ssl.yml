@@ -1,0 +1,26 @@
+# {{ ansible_managed }}
+master:
+ image:  {{docker_repo}}{{master_image}}:{{master_version}}
+ privileged: true
+ volumes:
+  - /var/jenkins_home:/var/jenkins_home
+ ports:
+  - "50000:50000"
+  {{port8080}}
+ environment:
+ - JAVA_OPTS=-Duser.timezone={{timezone}}
+
+nginx:
+ image:  {{docker_repo}}{{nginx_image}}:{{nginx_version}}
+ ports:
+  - "80:80"
+  - "443:443"
+ links:
+  - master:jenkins-master
+ volumes:
+  - {{dockerComposeDir}}/id/jenkins.conf:/etc/nginx/conf.d/jenkins.conf
+  - {{dockerComposeDir}}/id/nginx-selfsigned.key:/etc/ssl/private/nginx-selfsigned.key
+  - {{dockerComposeDir}}/id/nginx-selfsigned.crt:/etc/ssl/certs/nginx-selfsigned.crt
+  - {{dockerComposeDir}}/id/dhparam.pem:/etc/ssl/certs/dhparam.pem
+
+

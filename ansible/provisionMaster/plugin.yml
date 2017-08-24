@@ -1,0 +1,23 @@
+---
+
+- hosts: testing
+
+
+
+  vars:
+    description: “this is to set up a Jenkins from GIT content, and the docker Jenkins master image.”
+    environment:
+      http_proxy: http://3.187.59.236:9400
+      https_proxy: http://3.187.59.236:9400
+      no_proxy: 3.*
+
+
+
+
+  remote_user: root
+  tasks:
+  - name: Install plugin
+    jenkins_plugin:
+       name: sonar
+       jenkins_home=/var/jenkins_home
+

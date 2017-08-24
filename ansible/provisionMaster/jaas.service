@@ -1,0 +1,13 @@
+# {{ ansible_managed }} {{template_run_date}}
+[Unit]
+Description=Jenkins as a service
+Requires=docker.service
+After=docker.service
+
+[Service]
+Restart=always
+ExecStart=/usr/local/bin/docker-compose -f {{dockerComposeDir}}/docker-compose-jenkins.yml up
+ExecStop=/usr/local/bin/docker-compose -f {{dockerComposeDir}}/docker-compose-jenkins.yml stop
+
+[Install]
+WantedBy=default.target
